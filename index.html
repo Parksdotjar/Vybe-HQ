@@ -1,39 +1,121 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>VYBE Chat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VYBE Live Chat</title>
+
   <style>
-    body{font-family:system-ui;max-width:780px;margin:40px auto;padding:0 16px}
-    #chat{border:1px solid #ddd;border-radius:14px;padding:12px;height:460px;overflow:auto}
-    .msg{padding:10px 8px;border-bottom:1px solid #f2f2f2}
-    .meta{font-size:12px;opacity:.65;margin-top:3px}
-    #auth{display:grid;gap:8px;margin-bottom:14px}
-    input,button{padding:10px 12px;border-radius:12px;border:1px solid #ddd}
-    form{display:flex;gap:8px;margin-top:12px}
-    #sendForm{display:none}
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      max-width: 820px;
+      margin: 40px auto;
+      padding: 0 16px;
+      background: #ffffff;
+      color: #111;
+    }
+
+    h2 {
+      margin-bottom: 12px;
+    }
+
+    /* AUTH */
+    #auth {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    input, button {
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #ddd;
+      font-size: 14px;
+    }
+
+    button {
+      cursor: pointer;
+      background: #f5f5f5;
+    }
+
+    button:hover {
+      background: #eee;
+    }
+
+    #status {
+      font-size: 13px;
+      margin-top: 4px;
+      color: #333;
+    }
+
+    /* CHAT BOX — FIX #1 */
+    #chat {
+      border: 1px solid #ddd;
+      border-radius: 14px;
+      padding: 12px;
+      height: 460px;
+      overflow-y: auto;
+
+      background: #ffffff;
+      color: #111;            /* 👈 FORCE TEXT COLOR */
+    }
+
+    /* MESSAGE BUBBLES — FIX #1 */
+    .msg {
+      padding: 10px 12px;
+      margin: 8px 0;
+      border-radius: 12px;
+      background: #f7f7f7;
+      border: 1px solid #eee;
+
+      color: #111;            /* 👈 FORCE TEXT COLOR */
+    }
+
+    .meta {
+      font-size: 12px;
+      opacity: 0.6;
+      margin-top: 3px;
+    }
+
+    /* SEND FORM */
+    form {
+      display: none;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    form input {
+      flex: 1;
+    }
   </style>
 </head>
+
 <body>
+
   <h2>VYBE Live Chat</h2>
 
+  <!-- AUTH -->
   <div id="auth">
     <input id="email" placeholder="email" />
     <input id="password" type="password" placeholder="password" />
+
     <button id="login">Log in</button>
     <button id="signup">Sign up</button>
     <button id="logout" style="display:none;">Log out</button>
-    <div id="status"></div>
+
+    <div id="status">Not logged in</div>
   </div>
 
+  <!-- CHAT -->
   <div id="chat"></div>
 
+  <!-- SEND MESSAGE -->
   <form id="sendForm">
     <input id="message" placeholder="Type a message…" autocomplete="off" />
     <button type="submit">Send</button>
   </form>
 
+  <!-- APP LOGIC -->
   <script type="module" src="./app.js"></script>
 </body>
 </html>
