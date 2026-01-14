@@ -4,8 +4,16 @@ const SUPABASE_URL = "https://hjyqbsvmhcrkzbnvsnbx.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqeXFic3ZtaGNya3pibnZzbmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MjA2NTgsImV4cCI6MjA4Mzk5NjY1OH0.CRCkps-aiZ4mbOygFd6IxdxLiiHbUOh_VTHsc4RYvbc";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+const appEl = document.getElementById("app");
+const authModalEl = document.getElementById("authModal");
+
 const chatEl = document.getElementById("chat");
 const statusEl = document.getElementById("status");
+const channelListEl = document.getElementById("channels");
+const channelTitleEl = document.getElementById("channelTitle");
+
+const channelNameEl = document.getElementById("channelName");
+const createChannelBtn = document.getElementById("createChannel");
 
 const emailEl = document.getElementById("email");
 const passwordEl = document.getElementById("password");
@@ -17,7 +25,11 @@ const logoutBtn = document.getElementById("logout");
 const sendForm = document.getElementById("sendForm");
 const msgInput = document.getElementById("message");
 
-let channel = null;
+let messagesChannel = null;
+let channelsChannel = null;
+let currentChannelId = null;
+let currentChannelName = null;
+
 const seenIds = new Set();
 
 function escapeHtml(str) {
@@ -32,6 +44,27 @@ function escapeHtml(str) {
 
 function isNearBottom(el) {
   return el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+}
+
+function setStatus(text) {
+  statusEl.textContent = text;
+}
+
+function setAuthVisible(show) {
+  authModalEl.classList.toggle("hidden", !show);
+  appEl.setAttribute("aria-hidden", show ? "true" : "false");
+}
+
+function resetChat() {
+  chatEl.innerHTML = "";
+  seenIds.clear();
+}
+
+function clearChannels() {
+  channelListEl.innerHTML = "";
+  currentChannelId = null;
+  currentChannelName = null;
+  channelTitleEl.textContent = "Select a channel";
 }
 
 function addMessageRow(msg) {
@@ -62,25 +95,135 @@ function addMessageRow(msg) {
   }
 }
 
+function addChannelRow(channel) {
+  if (!channel?.id || !channel?.name) return;
+  if (channelListEl.querySelector(`[data-id="${channel.id}"]`)) return;
+
+  const btn = document.createElement("button");
+  btn.className = "channel-btn";
+  btn.dataset.id = channel.id;
+  btn.textContent = `# ${channel.name}`;
+  btn.addEventListener("click", () => selectChannel(channel));
+
+  channelListEl.appendChild(btn);
+
+  if (!currentChannelId) {
+    selectChannel(channel);
+  }
+}
+
+function updateActiveChannelButton() {
+  const buttons = channelListEl.querySelectorAll(".channel-btn");
+  buttons.forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.id === currentChannelId);
+  });
+}
+
 async function loadMessages() {
-  chatEl.innerHTML = "";
-  seenIds.clear();
+  if (!currentChannelId) {
+    resetChat();
+    setStatus("Select a channel to load messages.");
+    return;
+  }
+
+  resetChat();
 
   const { data, error } = await supabase
     .from("messages")
     .select("*")
+    .eq("channel_id", currentChannelId)
     .order("created_at", { ascending: true })
     .limit(200);
 
   if (error) {
-    statusEl.textContent = "Load error: " + error.message;
+    setStatus("Load error: " + error.message);
     return;
   }
 
-  statusEl.textContent = `Logged in ✅ | Loaded ${data.length} messages`;
+  setStatus(`Logged in | Loaded ${data.length} messages`);
   for (const m of data) addMessageRow(m);
 
   chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+async function loadChannels() {
+  clearChannels();
+
+  const { data, error } = await supabase
+    .from("channels")
+    .select("*")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    setStatus("Channel load error: " + error.message);
+    return;
+  }
+
+  for (const c of data) addChannelRow(c);
+
+  if (!data.length) {
+    setStatus("No channels yet. Create one to start chatting.");
+  }
+}
+
+async function ensureMessagesSubscribed() {
+  if (!currentChannelId) return;
+
+  if (messagesChannel) {
+    await supabase.removeChannel(messagesChannel);
+    messagesChannel = null;
+  }
+
+  messagesChannel = supabase
+    .channel(`vybe-messages-${currentChannelId}`, { config: { broadcast: { ack: true } } })
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "messages", filter: `channel_id=eq.${currentChannelId}` },
+      (payload) => addMessageRow(payload.new)
+    )
+    .subscribe((state) => {
+      const base = statusEl.textContent.includes("Logged in")
+        ? statusEl.textContent.split(" | ")[0]
+        : "Logged in";
+      setStatus(`${base} | Realtime: ${state}`);
+    });
+}
+
+async function ensureChannelsSubscribed() {
+  if (channelsChannel) return;
+
+  channelsChannel = supabase
+    .channel("vybe-channels", { config: { broadcast: { ack: true } } })
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "channels" },
+      (payload) => addChannelRow(payload.new)
+    )
+    .subscribe();
+}
+
+async function teardownRealtime() {
+  if (messagesChannel) {
+    await supabase.removeChannel(messagesChannel);
+    messagesChannel = null;
+  }
+  if (channelsChannel) {
+    await supabase.removeChannel(channelsChannel);
+    channelsChannel = null;
+  }
+}
+
+function selectChannel(channel) {
+  if (!channel?.id) return;
+  if (currentChannelId === channel.id) return;
+
+  currentChannelId = channel.id;
+  currentChannelName = channel.name;
+  channelTitleEl.textContent = `# ${currentChannelName}`;
+  updateActiveChannelButton();
+
+  loadMessages();
+  ensureMessagesSubscribed();
 }
 
 async function refreshAuthUI() {
@@ -92,33 +235,11 @@ async function refreshAuthUI() {
   logoutBtn.style.display = loggedIn ? "" : "none";
   sendForm.style.display = loggedIn ? "flex" : "none";
 
-  if (!loggedIn) statusEl.textContent = "Not logged in";
-}
+  setAuthVisible(!loggedIn);
 
-async function ensureRealtimeSubscribed() {
-  // prevent duplicate subscriptions
-  if (channel) return;
-
-  channel = supabase
-    .channel("vybe-chat", { config: { broadcast: { ack: true } } })
-    .on(
-      "postgres_changes",
-      { event: "INSERT", schema: "public", table: "messages" },
-      (payload) => addMessageRow(payload.new)
-    )
-    .subscribe((state) => {
-      // states: SUBSCRIBED / TIMED_OUT / CLOSED / CHANNEL_ERROR
-      const base = statusEl.textContent.includes("Logged in")
-        ? statusEl.textContent.split(" | ")[0]
-        : statusEl.textContent;
-      statusEl.textContent = `${base} | Realtime: ${state}`;
-    });
-}
-
-async function teardownRealtime() {
-  if (!channel) return;
-  await supabase.removeChannel(channel);
-  channel = null;
+  if (!loggedIn) {
+    setStatus("Not logged in");
+  }
 }
 
 loginBtn.addEventListener("click", async () => {
@@ -127,13 +248,13 @@ loginBtn.addEventListener("click", async () => {
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    statusEl.textContent = "Login error: " + error.message;
+    setStatus("Login error: " + error.message);
     return;
   }
 
   await refreshAuthUI();
-  await loadMessages();
-  await ensureRealtimeSubscribed();
+  await loadChannels();
+  await ensureChannelsSubscribed();
 });
 
 signupBtn.addEventListener("click", async () => {
@@ -141,16 +262,32 @@ signupBtn.addEventListener("click", async () => {
   const password = passwordEl.value;
 
   const { error } = await supabase.auth.signUp({ email, password });
-  if (error) statusEl.textContent = "Signup error: " + error.message;
-  else statusEl.textContent = "Account created! Now log in.";
+  if (error) setStatus("Signup error: " + error.message);
+  else setStatus("Account created! Now log in.");
 });
 
 logoutBtn.addEventListener("click", async () => {
   await supabase.auth.signOut();
   await teardownRealtime();
   await refreshAuthUI();
-  chatEl.innerHTML = "";
-  seenIds.clear();
+  clearChannels();
+  resetChat();
+});
+
+createChannelBtn.addEventListener("click", async () => {
+  const name = channelNameEl.value.trim();
+  if (!name) {
+    setStatus("Enter a channel name.");
+    return;
+  }
+
+  const { error } = await supabase.from("channels").insert({ name });
+  if (error) {
+    setStatus("Channel create error: " + error.message);
+    return;
+  }
+
+  channelNameEl.value = "";
 });
 
 sendForm.addEventListener("submit", async (e) => {
@@ -158,17 +295,20 @@ sendForm.addEventListener("submit", async (e) => {
 
   const content = msgInput.value.trim();
   if (!content) return;
+  if (!currentChannelId) {
+    setStatus("Pick a channel before sending messages.");
+    return;
+  }
 
   const { data: sessionData } = await supabase.auth.getSession();
   const user = sessionData.session?.user;
   if (!user) {
-    statusEl.textContent = "You must be logged in.";
+    setStatus("You must be logged in.");
     return;
   }
 
   const display_name = user.email?.split("@")[0] ?? "user";
 
-  // Optimistic UI (feels faster)
   const tempId = "temp-" + crypto.randomUUID();
   addMessageRow({
     id: tempId,
@@ -183,10 +323,11 @@ sendForm.addEventListener("submit", async (e) => {
     user_id: user.id,
     display_name,
     content,
+    channel_id: currentChannelId,
   });
 
   if (error) {
-    statusEl.textContent = "Send error: " + error.message;
+    setStatus("Send error: " + error.message);
   }
 });
 
@@ -194,6 +335,6 @@ sendForm.addEventListener("submit", async (e) => {
 await refreshAuthUI();
 const session = await supabase.auth.getSession();
 if (session.data.session) {
-  await loadMessages();
-  await ensureRealtimeSubscribed();
+  await loadChannels();
+  await ensureChannelsSubscribed();
 }

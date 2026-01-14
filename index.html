@@ -34,10 +34,10 @@
       padding:28px 16px;
     }
 
-    .wrap{
-      width:min(980px, 100%);
+    .app{
+      width:min(1100px, 100%);
       display:grid;
-      grid-template-columns: 360px 1fr;
+      grid-template-columns: 260px 1fr;
       gap:16px;
     }
 
@@ -49,8 +49,12 @@
       overflow:hidden;
     }
 
-    .left{
-      padding:18px;
+    .sidebar{
+      padding:16px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      min-height: 640px;
     }
 
     .brand{
@@ -58,6 +62,7 @@
       align-items:center;
       justify-content:space-between;
       margin-bottom:12px;
+      gap:10px;
     }
 
     .title{
@@ -127,7 +132,7 @@
     }
 
     #status{
-      margin-top:12px;
+      margin-top:auto;
       font-size:12px;
       color: var(--muted);
       padding:10px 12px;
@@ -220,39 +225,104 @@
       cursor:pointer;
     }
 
+    .channels{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      margin-top:6px;
+      max-height: 360px;
+      overflow:auto;
+      padding-right:4px;
+    }
+
+    .channel-btn{
+      text-align:left;
+      border-radius:12px;
+      padding:10px 12px;
+      border:1px solid rgba(255,255,255,.08);
+      background: rgba(15,17,23,.55);
+      color: var(--text);
+      cursor:pointer;
+    }
+
+    .channel-btn.active{
+      border-color: rgba(139,92,246,.55);
+      box-shadow: 0 0 0 2px rgba(139,92,246,.18);
+    }
+
+    .channel-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+    }
+
+    .channel-form{
+      display:flex;
+      gap:8px;
+      margin-top:8px;
+    }
+
+    .channel-form input{
+      flex:1;
+    }
+
+    .auth-modal{
+      position:fixed;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background: rgba(5,6,10,.75);
+      backdrop-filter: blur(6px);
+      opacity:1;
+      visibility:visible;
+      transition: opacity .35s ease, visibility .35s ease;
+      padding:24px 16px;
+    }
+
+    .auth-modal.hidden{
+      opacity:0;
+      visibility:hidden;
+      pointer-events:none;
+    }
+
+    .auth-card{
+      width:min(420px, 100%);
+      padding:18px;
+    }
+
     @media (max-width: 900px){
-      .wrap{ grid-template-columns: 1fr; }
+      .app{ grid-template-columns: 1fr; }
       .right{ min-height: 560px; }
     }
   </style>
 </head>
 
 <body>
-  <div class="wrap">
-    <!-- LEFT / AUTH -->
-    <div class="card left">
+  <div id="app" class="app">
+    <!-- LEFT / CHANNELS -->
+    <div class="card sidebar">
       <div class="brand">
         <h1 class="title">VYBE Chat</h1>
-        <div class="badge">internal</div>
+        <button id="logout" class="btn2" style="display:none;">Log out</button>
       </div>
 
       <div class="hint">
-        Log in or create an account to join the live chat.
-        <br/>Purple status = realtime connection state.
+        Create channels like Discord. New channels appear instantly for everyone.
       </div>
 
-      <label for="email">Email</label>
-      <input id="email" placeholder="you@vybe…" />
-
-      <label for="password">Password</label>
-      <input id="password" type="password" placeholder="••••••••••••" />
-
-      <div class="row">
-        <button id="login" class="btn">Log in</button>
-        <button id="signup" class="btn2">Sign up</button>
+      <div class="channel-header">
+        <div style="font-weight:700;">Channels</div>
+        <div class="badge">live</div>
       </div>
 
-      <button id="logout" class="btn2" style="display:none; margin-top:10px;">Log out</button>
+      <div class="channel-form">
+        <input id="channelName" placeholder="new-channel" />
+        <button id="createChannel" class="btn2" type="button">Add</button>
+      </div>
+
+      <div id="channels" class="channels"></div>
 
       <div id="status">Not logged in</div>
     </div>
@@ -261,18 +331,42 @@
     <div class="card right">
       <div class="topbar">
         <div>
-          <div style="font-weight:700;">Live feed</div>
-          <div class="sub">Keep it simple — updates, tasks, quick notes.</div>
+          <div id="channelTitle" style="font-weight:700;">Select a channel</div>
+          <div class="sub">Messages only show for the active channel.</div>
         </div>
-        <div class="sub">black/gray + purple</div>
+        <div class="sub">Realtime</div>
       </div>
 
       <div id="chat"></div>
 
       <form id="sendForm">
-        <input id="message" placeholder="Type a message…" autocomplete="off" />
+        <input id="message" placeholder="Type a message" autocomplete="off" />
         <button class="sendbtn" type="submit">Send</button>
       </form>
+    </div>
+  </div>
+
+  <div id="authModal" class="auth-modal">
+    <div class="card auth-card">
+      <div class="brand">
+        <h1 class="title">VYBE Chat</h1>
+        <div class="badge">internal</div>
+      </div>
+
+      <div class="hint">
+        Log in or create an account to join the live chat.
+      </div>
+
+      <label for="email">Email</label>
+      <input id="email" placeholder="you@vybe.com" />
+
+      <label for="password">Password</label>
+      <input id="password" type="password" placeholder="************" />
+
+      <div class="row">
+        <button id="login" class="btn">Log in</button>
+        <button id="signup" class="btn2">Sign up</button>
+      </div>
     </div>
   </div>
 
