@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>VYBE Chat</title>
+  <style>
+    body{font-family:system-ui;max-width:780px;margin:40px auto;padding:0 16px}
+    #chat{border:1px solid #ddd;border-radius:14px;padding:12px;height:460px;overflow:auto}
+    .msg{padding:10px 8px;border-bottom:1px solid #f2f2f2}
+    .meta{font-size:12px;opacity:.65;margin-top:3px}
+    #auth{display:grid;gap:8px;margin-bottom:14px}
+    input,button{padding:10px 12px;border-radius:12px;border:1px solid #ddd}
+    form{display:flex;gap:8px;margin-top:12px}
+    #sendForm{display:none}
+  </style>
+</head>
+<body>
+  <h2>VYBE Live Chat</h2>
+
+  <div id="auth">
+    <input id="email" placeholder="email" />
+    <input id="password" type="password" placeholder="password" />
+    <button id="login">Log in</button>
+    <button id="logout" style="display:none;">Log out</button>
+    <div id="status"></div>
+  </div>
+
+  <div id="chat"></div>
+
+  <form id="sendForm">
+    <input id="message" placeholder="Type a message…" autocomplete="off" />
+    <button type="submit">Send</button>
+  </form>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
