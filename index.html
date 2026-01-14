@@ -144,7 +144,7 @@
     .right{
       display:flex;
       flex-direction:column;
-      min-height: 640px;
+      height: 640px;
     }
 
     .topbar{
@@ -161,12 +161,30 @@
       color: var(--muted);
     }
 
-    #chat{
+    .chat-wrap{
+      position:relative;
       flex:1;
+      overflow:hidden;
+      background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+    }
+
+    #chat{
+      height:100%;
       padding:16px;
       overflow:auto;
-      background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
       color: var(--text);
+    }
+
+    .chat-wrap::before{
+      content:"";
+      position:absolute;
+      top:0;
+      left:0;
+      right:0;
+      height:26px;
+      background: linear-gradient(180deg, rgba(11,12,16,.95), rgba(11,12,16,0));
+      pointer-events:none;
+      z-index:2;
     }
 
     .msg{
@@ -265,6 +283,8 @@
 
     .channel-form input{
       flex:1;
+      color: var(--text);
+      background: rgba(15,17,23,.9);
     }
 
     .auth-modal{
@@ -318,7 +338,7 @@
       </div>
 
       <div class="channel-form">
-        <input id="channelName" placeholder="new-channel" />
+        <input id="channelName" placeholder="new-channel" maxlength="15" />
         <button id="createChannel" class="btn2" type="button">Add</button>
       </div>
 
@@ -337,7 +357,9 @@
         <div class="sub">Realtime</div>
       </div>
 
-      <div id="chat"></div>
+      <div class="chat-wrap">
+        <div id="chat"></div>
+      </div>
 
       <form id="sendForm">
         <input id="message" placeholder="Type a message" autocomplete="off" />
