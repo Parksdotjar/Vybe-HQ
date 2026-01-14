@@ -9,6 +9,7 @@ const authModalEl = document.getElementById("authModal");
 
 const chatEl = document.getElementById("chat");
 const statusEl = document.getElementById("status");
+const authStatusEl = document.getElementById("authStatus");
 const channelListEl = document.getElementById("channels");
 const channelTitleEl = document.getElementById("channelTitle");
 
@@ -48,6 +49,9 @@ function isNearBottom(el) {
 
 function setStatus(text) {
   statusEl.textContent = text;
+  if (!authModalEl.classList.contains("hidden")) {
+    authStatusEl.textContent = text;
+  }
 }
 
 function setAuthVisible(show) {
@@ -226,20 +230,24 @@ function selectChannel(channel) {
   ensureMessagesSubscribed();
 }
 
-async function refreshAuthUI() {
-  const { data } = await supabase.auth.getSession();
-  const loggedIn = !!data.session;
-
+function setLoggedInUI(loggedIn) {
   loginBtn.style.display = loggedIn ? "none" : "";
   signupBtn.style.display = loggedIn ? "none" : "";
   logoutBtn.style.display = loggedIn ? "" : "none";
   sendForm.style.display = loggedIn ? "flex" : "none";
+  createChannelBtn.disabled = !loggedIn;
+  channelNameEl.disabled = !loggedIn;
 
   setAuthVisible(!loggedIn);
 
   if (!loggedIn) {
     setStatus("Not logged in");
   }
+}
+
+async function refreshAuthUI() {
+  const { data } = await supabase.auth.getSession();
+  setLoggedInUI(!!data.session);
 }
 
 loginBtn.addEventListener("click", async () => {
@@ -268,10 +276,6 @@ signupBtn.addEventListener("click", async () => {
 
 logoutBtn.addEventListener("click", async () => {
   await supabase.auth.signOut();
-  await teardownRealtime();
-  await refreshAuthUI();
-  clearChannels();
-  resetChat();
 });
 
 createChannelBtn.addEventListener("click", async () => {
@@ -338,3 +342,17 @@ if (session.data.session) {
   await loadChannels();
   await ensureChannelsSubscribed();
 }
+
+supabase.auth.onAuthStateChange(async (event, session) => {
+  const loggedIn = !!session;
+  setLoggedInUI(loggedIn);
+
+  if (loggedIn) {
+    await loadChannels();
+    await ensureChannelsSubscribed();
+  } else {
+    await teardownRealtime();
+    clearChannels();
+    resetChat();
+  }
+});
