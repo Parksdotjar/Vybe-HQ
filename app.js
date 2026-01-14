@@ -5,36 +5,52 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// 🔗 DOM ELEMENTS
 const chatEl = document.getElementById("chat");
 const statusEl = document.getElementById("status");
-const loginBtn = document.getElementById("login");
-const logoutBtn = document.getElementById("logout");
+
 const emailEl = document.getElementById("email");
 const passwordEl = document.getElementById("password");
+
+const loginBtn = document.getElementById("login");
+const signupBtn = document.getElementById("signup");
+const logoutBtn = document.getElementById("logout");
+
 const sendForm = document.getElementById("sendForm");
 const msgInput = document.getElementById("message");
 
-function escapeHtml(s) {
-  return (s ?? "").replace(/[&<>"']/g, (c) => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+// 🧼 ESCAPE HTML (SECURITY)
+function escapeHtml(str) {
+  return (str ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
   }[c]));
 }
 
-function addMessageRow(m) {
+// 💬 ADD MESSAGE TO UI
+function addMessageRow(msg) {
   const div = document.createElement("div");
   div.className = "msg";
-  const when = new Date(m.created_at).toLocaleString();
-  const name = m.display_name || "staff";
+
+  const time = new Date(msg.created_at).toLocaleTimeString();
+  const name = msg.display_name || "user";
+
   div.innerHTML = `
-    <div><b>${escapeHtml(name)}:</b> ${escapeHtml(m.content)}</div>
-    <div class="meta">${when}</div>
+    <div><b>${escapeHtml(name)}:</b> ${escapeHtml(msg.content)}</div>
+    <div class="meta">${time}</div>
   `;
+
   chatEl.appendChild(div);
   chatEl.scrollTop = chatEl.scrollHeight;
 }
 
+// 📥 LOAD EXISTING MESSAGES
 async function loadMessages() {
   chatEl.innerHTML = "";
+
   const { data, error } = await supabase
     .from("messages")
     .select("*")
@@ -45,46 +61,79 @@ async function loadMessages() {
     statusEl.textContent = "Load error: " + error.message;
     return;
   }
+
   data.forEach(addMessageRow);
 }
 
+// 🔐 AUTH UI STATE
 async function refreshAuthUI() {
   const { data } = await supabase.auth.getSession();
   const loggedIn = !!data.session;
 
   loginBtn.style.display = loggedIn ? "none" : "";
-  logoutBtn.style.display = loggedIn ? "" : "none";
+  signupBtn.style.display = loggedIn ? "none" : "";
+  logoutBtn.style.display = loggedIn ? "" : "";
+
   sendForm.style.display = loggedIn ? "flex" : "none";
 
-  statusEl.textContent = loggedIn ? "Logged in ✅" : "Not logged in";
+  statusEl.textContent = loggedIn
+    ? "Logged in ✅"
+    : "Not logged in";
 }
 
-// Login (email+password) :contentReference[oaicite:8]{index=8}
+// 🔑 LOGIN
 loginBtn.addEventListener("click", async () => {
   const email = emailEl.value.trim();
   const password = passwordEl.value;
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) statusEl.textContent = "Login error: " + error.message;
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    statusEl.textContent = "Login error: " + error.message;
+  }
 });
 
+// 🆕 SIGN UP (PUBLIC ACCOUNT CREATION)
+signupBtn.addEventListener("click", async () => {
+  const email = emailEl.value.trim();
+  const password = passwordEl.value;
+
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+  });
+
+  if (error) {
+    statusEl.textContent = "Signup error: " + error.message;
+  } else {
+    statusEl.textContent = "Account created! You can now log in.";
+  }
+});
+
+// 🚪 LOG OUT
 logoutBtn.addEventListener("click", async () => {
   await supabase.auth.signOut();
 });
 
+// ✉️ SEND MESSAGE
 sendForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+
   const content = msgInput.value.trim();
   if (!content) return;
 
   const { data: sessionData } = await supabase.auth.getSession();
   const user = sessionData.session?.user;
+
   if (!user) {
-    statusEl.textContent = "You must log in.";
+    statusEl.textContent = "You must be logged in.";
     return;
   }
 
-  const display_name = user.email?.split("@")[0] ?? "staff";
+  const display_name = user.email?.split("@")[0] ?? "user";
 
   const { error } = await supabase.from("messages").insert({
     user_id: user.id,
@@ -92,25 +141,32 @@ sendForm.addEventListener("submit", async (e) => {
     content,
   });
 
-  if (error) statusEl.textContent = "Send error: " + error.message;
-  else msgInput.value = "";
+  if (error) {
+    statusEl.textContent = "Send error: " + error.message;
+  } else {
+    msgInput.value = "";
+  }
 });
 
-// Realtime: listen for INSERTs (live messages)
-// Requires table in supabase_realtime publication :contentReference[oaicite:9]{index=9}
+// ⚡ REALTIME CHAT LISTENER
 supabase
-  .channel("vybe-chat")
-  .on("postgres_changes",
+  .channel("live-chat")
+  .on(
+    "postgres_changes",
     { event: "INSERT", schema: "public", table: "messages" },
     (payload) => addMessageRow(payload.new)
   )
   .subscribe();
 
+// 🔁 AUTH STATE CHANGE HANDLER
 supabase.auth.onAuthStateChange(async () => {
   await refreshAuthUI();
   await loadMessages();
 });
 
-// initial
+// 🚀 INITIAL LOAD
 await refreshAuthUI();
-if ((await supabase.auth.getSession()).data.session) await loadMessages();
+const session = await supabase.auth.getSession();
+if (session.data.session) {
+  await loadMessages();
+}
